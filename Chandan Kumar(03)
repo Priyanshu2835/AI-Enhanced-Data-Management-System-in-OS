@@ -1,0 +1,97 @@
+UI MODEL
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+from data_manager_system import DataManagerSystem
+
+class DataManagerUI:
+    def __init__(self):
+        self.system = DataManagerSystem()
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.file_dropdown = widgets.Dropdown(
+            options=self.system.list_files(),
+            description='📂 Dataset:',
+            style={'description_width': 'initial'}
+        )
+
+        self.load_btn = widgets.Button(description='Load Data', button_style='success')
+        self.clean_btn = widgets.Button(description='Clean Data', button_style='info', disabled=True)
+        self.analyze_btn = widgets.Button(description='Analyze', button_style='warning', disabled=True)
+        self.system_btn = widgets.Button(description='System Info', button_style='primary')
+        self.save_btn = widgets.Button(description='Save Data', button_style='danger', disabled=True)
+
+        self.load_btn.on_click(self.on_load_click)
+        self.clean_btn.on_click(self.on_clean_click)
+        self.analyze_btn.on_click(self.on_analyze_click)
+        self.system_btn.on_click(self.on_system_click)
+        self.save_btn.on_click(self.on_save_click)
+
+        self.progress = widgets.FloatProgress(value=0, min=0, max=100, description='Progress:')
+        self.status_output = widgets.Output()
+        self.data_output = widgets.Output()
+        self.system_output = widgets.Output()
+
+        self.tabs = widgets.Tab(children=[self.data_output, self.system_output])
+        self.tabs.set_title(0, 'Data View')
+        self.tabs.set_title(1, 'System Info')
+
+        self.ui = widgets.VBox([
+            widgets.HTML("<h1>📊 AI-Powered Data Manager</h1>"),
+            widgets.HBox([self.file_dropdown, self.load_btn]),
+            widgets.HTML("<h3>Actions:</h3>"),
+            widgets.HBox([self.clean_btn, self.analyze_btn, self.system_btn, self.save_btn]),
+            self.progress,
+            self.status_output,
+            self.tabs
+        ])
+
+    def show(self):
+        display(self.ui)
+
+    def update_progress(self, value, description=None):
+        self.progress.value = value
+        if description:
+            self.progress.description = description
+
+    def log_status(self, message, is_error=False):
+        with self.status_output:
+            print(f"❌ {message}" if is_error else f"✅ {message}")
+
+    def on_load_click(self, btn):
+        filename = self.file_dropdown.value
+        if filename == "No CSV files found":
+            self.log_status("No CSV files available to load", True)
+            return
+
+        self.update_progress(0, "Loading...")
+        self.system.load_data(filename, self.data_output, self.update_progress, self.log_status)
+
+        if self.system.current_df is not None:
+            self.clean_btn.disabled = False
+            self.analyze_btn.disabled = False
+            self.save_btn.disabled = False
+
+    def on_clean_click(self, btn):
+        self.update_progress(0, "Cleaning...")
+        self.system.clean_data(self.data_output, self.update_progress, self.log_status)
+        self.update_progress(100, "Ready")
+
+    def on_analyze_click(self, btn):
+        self.update_progress(0, "Analyzing...")
+        self.system.generate_summary(self.data_output, self.update_progress, self.log_status)
+        self.update_progress(100, "Ready")
+
+    def on_system_click(self, btn):
+        self.update_progress(0, "Gathering system info...")
+        self.system.display_system_info(self.system_output, self.update_progress, self.log_status)
+        self.update_progress(100, "Ready")
+
+    def on_save_click(self, btn):
+        filename = f"cleaned_{self.file_dropdown.value}"
+        self.system.save_data(filename, self.data_output, self.update_progress, self.log_status)
+        self.update_progress(100, "Ready")
+
+if __name__ == "__main__":
+    ui = DataManagerUI()
+    ui.show()
